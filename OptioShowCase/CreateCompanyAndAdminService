@@ -1,0 +1,26 @@
+public void CreateCompanyAndAdmin(ConfirmSignUpAddRequest signUp)
+        {
+            SecurityToken confirmedSecurityToken = _securityTokenService.SelectByGuid(signUp.Guid);
+            int companyId = 0;
+            CompanyAddRequest newCompany = new CompanyAddRequest();
+            newCompany.CompanyName = signUp.CompanyName;
+            newCompany.TenantId = confirmedSecurityToken.TenantId;
+            newCompany.UserId = confirmedSecurityToken.UserId;
+            companyId = _companyService.Post(newCompany);
+            int employeeId = 0;
+            EmployeeAddAdminRequest newEmployee = new EmployeeAddAdminRequest();
+            newEmployee.FirstName = signUp.FirstName;
+            newEmployee.LastName = signUp.LastName;
+            newEmployee.EmailAddress = signUp.EmailAddress;
+            newEmployee.TenantId = confirmedSecurityToken.TenantId;
+            newEmployee.UserId = confirmedSecurityToken.UserId;
+            employeeId = _employeesService.InsertAdmin(newEmployee);
+            RoleAddRequest newRole = new RoleAddRequest();
+            newRole.RoleName = "Admin";
+            newRole.UserId = confirmedSecurityToken.UserId;
+            newRole.TenantId = confirmedSecurityToken.TenantId;
+            newRole.EmployeeId = employeeId;
+            _roleService.GrantRoleToNewEmployee(newRole);
+            _securityTokenService.DeleteByGuidAndExpired(signUp.Guid);
+        }
+
