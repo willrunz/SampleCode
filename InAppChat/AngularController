@@ -1,0 +1,369 @@
+(function () {
+    "use strict";
+
+    angular.module(APPNAME)
+        .controller("chatController", ChatController);
+
+    ChatController.$inject = ['$scope', '$baseController', '$timeout', '$sabio', '$chatService', '$accountsService', '$employeeService'];
+
+    function ChatController(
+        $scope
+        , $baseController
+        , $timeout
+        , $sabio
+        , $chatService
+        , $accountsService
+        , $employeeService) {
+
+        var vm = this;
+
+        //service & scope injection
+        vm.$chatService = $chatService;
+        vm.$accountsService = $accountsService;
+        vm.$employeeService = $employeeService;
+        vm.$scope = $scope;
+
+        //default values
+        vm.whichView = 0;
+        vm.todayLocal = new Date();
+        vm.accountsList = [];
+        vm.lastRecord = null;
+        vm.thisAccount = {
+            id: $sabio.acccountId
+        };
+        vm.chosenAccount = {
+            id: null
+        };
+        vm.employeesList = [
+            {
+                id: 0
+                , firstName: "All"
+                , lastName: "Employees"
+            }
+        ];
+        vm.thisEmployee = {
+            id: $sabio.employeeId
+            , employeeFirstName: null
+            , employeeLastName: null
+        };
+        vm.priorityList = [
+        {
+            priority: 1
+            , priorityLabel: 'Normal'
+        }
+            , {
+                priority: 2
+        , priorityLabel: 'High'
+            }
+            , {
+                priority: 3
+        , priorityLabel: 'Critical'
+            }
+        ];
+        vm.looping = true;
+        vm.numberOfChats = 0;
+        vm.chats = []; //chats from db
+        vm.clear = {
+            accountIdQuery: null
+            , employeeIdQuery: null
+            , dateStartQuery: null
+            , dateEndQuery: null
+            , priorityQuery: 1
+        };
+        vm.chatForm = null;
+        vm.newChat = {
+            priority: 1
+        };
+        vm.showNewChatErrors = false;
+        vm.thisChat = {};
+        vm.showSearch = false;
+        vm.dateEnd = null;
+        vm.dateStart = null;
+        vm.accountIdDropDown = null;
+        vm.employeeIdDropDown = null;
+        vm.query = {
+            accountIdQuery: vm.thisAccount.id || vm.accountIdDropDown
+            , employeeIdQuery: null
+            , dateStartQuery: null
+            , dateEndQuery: null
+            , priorityQuery: 1
+        };
+
+        //available functions
+        vm.chatPic = _chatPic;
+        vm.chatSubmit = _chatSubmit;
+        vm.forceScroll = _forceScroll;
+        vm.reset = _reset;
+        vm.search = _search;
+        vm.showSearchButton = _showSearchButton;
+        vm.softDelete = _softDelete;
+
+        $baseController.merge(vm, $baseController);
+        vm.notify = vm.$chatService.getNotifier($scope);
+
+        render();
+
+        function render() {
+            if ($sabio.accountId) {
+                vm.whichView = 2;
+                vm.$accountsService.selectById($sabio.accountId, _getAccountSuccess, _getAccountError);
+            } else {
+                vm.whichView = 1;
+                vm.$accountsService.selectAll(_onGetAccountsSuccess, _onGetAccountsError);
+            }
+        }
+
+        //putting chats in window
+        function _loadChats(obj) {
+            if (vm.thisAccount.id == null) {
+                if (vm.chosenAccount.id != obj.accountIdQuery) {
+                    for (var i = 0; i < vm.accountsList.length; i++) {
+                        if (vm.accountsList[i].id == obj.accountIdQuery) {
+                            vm.chosenAccount = vm.accountsList[i];
+                            break;
+                        }
+                    }
+                }
+            }
+            vm.$chatService.findByQueryAdmin(obj, _onGetChatsSuccess, _onGetChatsError);
+        }
+        
+        function _forceScroll() {
+            vm.numberOfChats++;
+            $timeout(function () {
+                vm.numberOfChats = vm.numberOfChats - 1;
+            },100);
+        }
+
+        //search keeps from crazy loops - reset starts loop again
+        function _search() {
+            var queryDate = null;
+            if (vm.dateStart != null) {
+                queryDate = new Date(vm.dateStart);
+                vm.query.dateStartQuery = queryDate.toISOString();
+            }
+            if (vm.dateEnd != null) {
+                queryDate = new Date(vm.dateEnd);
+                vm.query.dateEndQuery = queryDate.toISOString();
+            }
+            if (vm.accountIdDropDown == 0) {
+                vm.query.accountIdQuery = null;
+            } else {
+                vm.query.accountIdQuery = vm.accountIdDropDown;
+            }
+            if (vm.employeeIdDropDown == 0) {
+                vm.query.employeeIdQuery = null;
+            } else {
+                vm.query.employeeIdQuery = vm.employeeIdDropDown;
+            }
+            vm.looping = false;
+            _loadChats(vm.query);
+        }
+
+        //submit chat
+        function _chatSubmit() {
+            vm.showNewChatErrors = true;
+            if (vm.chatForm.$valid) {
+                vm.todayLocal = new Date();
+                vm.newChat.datePostedLocal = vm.todayLocal
+                vm.newChat.subject = "";
+                vm.newChat.accountId = vm.thisAccount.id || vm.chosenAccount.id;
+                vm.newChat.employeeId = vm.thisEmployee.id;
+                var data = JSON.stringify(vm.newChat);
+                vm.$chatService.sendChat(vm.newChat.accountId, data, _onPostChatSuccess, _onPostChatError);
+                console.log('sending new chat');
+            } else {
+                console.log('error with data in form', vm.newChat);
+                swal("Error!", "Did you mean to send an empty message?", "error");
+            }
+        }
+
+        //resets search window and restarts loop
+        function _reset() {
+            if (!vm.looping) {
+                vm.query = angular.copy(vm.clear);
+                vm.dateStart = null;
+                vm.dateEnd = null;
+                vm.accountIdDropDown = null
+                vm.employeeIdDropDown = null;
+                vm.looping = true;
+                _loadChats(vm.clear);
+            }
+        }
+
+        //show search window
+        function _showSearchButton() {
+            vm.showSearch = !vm.showSearch;
+        }
+
+        //changes pic based on user - currently only chooses between two pic
+        function _chatPic(id) {
+            for (var i = 0; i < vm.employeesList.length; i++) {
+                if (vm.employeesList[i].id == id) {
+                    var emp = vm.employeesList[i];
+                    if (emp.employeePhotos != null) {
+                        for (var j = 0; j < emp.employeePhotos.length; j++) {
+                            if (emp.employeePhotos[j].isPrimary) {
+                                return emp.employeePhotos[j].photoUrl;
+                            }
+                        }
+                    if (vm.thisEmployee.id == id)
+                        return "/images/OptioLogo_Small.jpg";
+                    return "/images/CompanyLogo_small.jpg";
+                    }
+                }
+            }
+        }
+
+        //soft delete
+        function _softDelete(chat) {
+            swal({
+                title: "Are you sure you want to delete this message?"
+                , text: "You will not be able to recover this!"
+                , type: "warning"
+                , showCancelButton: true
+                , confirmButtonColor: "#DD6B55"
+                , confirmButtonText: "Yes, delete it!"
+                , closeOnConfirm: false
+            }, function () {
+                var deletedChat = {
+                    accountId: vm.thisAccount.id || vm.chosenAccount.id
+                    , id: chat.id
+                };
+                var data = JSON.stringify(deletedChat);
+                vm.$chatService.softDelete(deletedChat, data, _onSoftDeleteSuccess, _onSoftDeleteError);
+                vm.thisChat = chat;
+            });
+
+        }
+
+        //ajax returns
+        function _onGetChatsSuccess(data) {
+            vm.notify(function () {
+                if (vm.chats != data.items) {
+                    vm.chats = data.items;
+                    vm.numberOfChats = (vm.chats) ? vm.chats.length - 1 : 0;
+                }
+                if (vm.looping) {
+                    $timeout(function () {
+                        if (vm.looping) {
+                            console.log('looping');
+                            _loadChats(vm.clear);
+                        }
+                    }, 10000);
+                }
+            });
+            
+        }
+
+        function _onGetChatsError(jqXHR, error) {
+            vm.notify(function () {
+                console.log(jqXHR.responseText);
+                vm.$alertService.warning(jqXHR.responseText);
+            });
+        }
+
+        function _onPostChatSuccess(data) {
+            if (!vm.looping) {
+                vm.looping = true;
+                _loadChats(vm.clear);;
+            }
+            vm.notify(function () {
+                console.log('successful post');
+                var chatPush = vm.newChat;
+                chatPush.employeeFirstName = vm.thisEmployee.employeeFirstName;
+                chatPush.employeeLastName = vm.thisEmployee.employeeLastName;
+                vm.chats.push(chatPush);
+                vm.numberOfChats = (vm.chats) ? vm.chats.length - 1 : 0;
+                vm.showNewChatErrors = false;
+                vm.newChat = null;
+                vm.newChat = {
+                    priority: 1
+                };
+            });
+        }
+
+        function _onPostChatError(jqXHR, error) {
+            vm.notify(function () {
+                console.log(jqXHR.responseText);
+                vm.$alertService.warning(jqXHR.responseText);
+                vm.isPost = false;
+            });
+        }
+
+        function _onGetAccountsSuccess(data) {
+            vm.notify(function () {
+                vm.accountsList = data.items;
+                vm.lastRecord = vm.accountsList.length - 1;
+                vm.chosenAccount = vm.accountsList[0];
+
+            });
+            vm.$employeeService.getAll(_onGetEmployeesSuccess, _onGetEmployeesError);
+        }
+
+        function _onGetAccountsError(jqXHR, error) {
+            vm.notify(function () {
+                console.log(jqXHR.responseText);
+                vm.$alertService.warning(jqXHR.responseText);
+            });
+        }
+
+        function _getAccountSuccess(data) {
+            vm.notify(function () {
+                vm.thisAccount = data.item;
+                vm.clear.accountIdQuery = vm.thisAccount.id;
+            });
+            vm.$employeeService.getAll(_onGetEmployeesSuccess, _onGetEmployeesError);
+        }
+
+        function _getAccountError(jqXHR, error) {
+            vm.notify(function () {
+                console.log(jqXHR.responseText);
+                vm.$alertService.warning(jqXHR.responseText);
+            });
+        }
+
+        function _onGetEmployeesSuccess(data) {
+            vm.notify(function () {
+                vm.employeesList = data.items.concat(vm.employeesList);
+                for (var i = 0; i < vm.employeesList.length; i++) {
+                    if (vm.employeesList[i].id == vm.thisEmployee.id) {
+                        vm.thisEmployee.employeeFirstName = vm.employeesList[i].firstName;
+                        vm.thisEmployee.employeeLastName = vm.employeesList[i].lastName;
+                        break;
+                    }
+                }
+            });
+            _loadChats(vm.clear);
+        }
+
+        function _onGetEmployeesError(jqXHR, error) {
+            vm.notify(function () {
+                console.log(jqXHR.responseText);
+                vm.$alertService.warning(jqXHR.responseText);
+            });
+        }
+
+        function _onSoftDeleteSuccess(data) {
+            vm.notify(function () {
+                for (var i = 0; i < vm.chats.length; i++) {
+                    if (vm.chats[i].id == vm.thisChat.id) {
+                        vm.chats.splice(i, 1);
+                        break;
+                    }
+                }
+            });
+            swal("Deleted!", "Your message has been deleted.", "success");
+        }
+
+        function _onSoftDeleteError(jqXHR, error) {
+            vm.notify(function () {
+                console.log(jqXHR.responseText);
+                vm.$alertService.warning(jqXHR.responseText);
+            });
+        }
+
+        //utilities
+
+    }
+})();
