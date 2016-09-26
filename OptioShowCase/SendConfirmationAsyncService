@@ -1,0 +1,33 @@
+public async Task SendConfirmationAsync(SignUpAddRequest request)
+        {
+
+            IdentityUser newUser = UserService.CreateUser(request.Email, request.Password);
+            string userId = newUser.Id;
+            TenantAddRequest tenant = new TenantAddRequest();
+            tenant.Name = request.CompanyName;
+            tenant.IsMaster = false;
+            tenant.UserId = userId;
+            int tenantId = _tenantService.Register(tenant);
+            SecurityTokenAddRequest newSecurityToken = new SecurityTokenAddRequest();
+            newSecurityToken.Guid = Guid.NewGuid();
+            newSecurityToken.CompanyName = request.CompanyName;
+            newSecurityToken.UserEmail = request.Email;
+            newSecurityToken.TenantId = tenantId;
+            newSecurityToken.UserId = userId;
+            newSecurityToken.TokenTypeId = 1;
+            _securityTokenService.Post(newSecurityToken);
+            string path = HttpContext.Current.Server.MapPath("~/EmailTemplates/SignUpConfirmEmail.html");
+            string html = File.ReadAllText(path);
+            string optioURL = ServiceConfig.BaseUrl;
+            html = html.Replace("[[URL-GOES-HERE]]", optioURL);
+            string endPoint = "/Companies/Create/";
+            html = html.Replace("[[END-POINT-GOES-HERE]]", endPoint);
+            html = html.Replace("[[xxxxxxxxxxxxxxx]]", newSecurityToken.Guid.ToString());
+            EmailSendRequest confirmEmail = new EmailSendRequest();
+            confirmEmail.Destination = request.Email;
+            confirmEmail.Subject = "Please Confirm You Registration With Optio!";
+            confirmEmail.Body = html;
+            confirmEmail.From = "optio@mailinator.com";
+            await _notificationService.SendEmailAsync(confirmEmail);
+
+        }
