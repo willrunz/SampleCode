@@ -1,0 +1,155 @@
+<div class="col-lg-4" ng-controller="chatController as chatVm">
+    <div class="ibox chat-view">
+        <div class="ibox-title">
+            <h5>Messages</h5>
+            <div class="ibox-tools" ibox-tools-optio="open">
+                <a>
+                    <i class="fa fa-chevron-up"></i>
+                </a>
+            </div>
+        </div>
+        <div class="ibox-content">
+            <div class="m-sm">
+                <small class="pull-right text-muted">Last message:  {{chatVm.chats[chatVm.numberOfChats].datePostedLocal | date:"short"}}</small>
+                <span ng-show="(chatVm.whichView==2)">{{chatVm.thisAccount.accountName}}</span>
+                <select ng-show="(chatVm.whichView==1)"
+                        name="filterByAccount"
+                        class="btn btn-sm btn-default"
+                        ng-model="chatVm.chosenAccount"
+                        ng-init="chatVm.chosenAccount = chatVm.accountsList[0]"
+                        ng-options="acct as acct.accountName for acct in chatVm.accountsList"
+                        ng-change="chatVm.forceScroll()">
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-md-12" scroll-down="chatVm.numberOfChats">
+                    <div class="chat-discussion scroll_content">
+                        <div ng-repeat="chat in filteredChats = (chatVm.chats | filter:{ accountId: chatsVm.thisAccount.id || chatVm.chosenAccount.id}: true)" ng-include="(chatVm.whichView==1)? 'adminChatTemplate':'guardChatTemplate'"></div>
+                    </div>
+                </div>
+            </div>
+            <form id="chatForm" name="chatVm.chatForm" ng-submit="chatVm.chatSubmit()" novalidate>
+                <div class="row">
+                    <div class="col-lg-12">
+                        <div class="input-group fa-border">
+                            <input type="text" class="input-sm form-control"
+                                   ng-class="{'error': chatVm.showNewChatErrors && !chatVm.chatForm.chatInput.$valid}"
+                                   placeholder="type message here..."
+                                   id="chatInput"
+                                   name="chatInput"
+                                   ng-model="chatVm.newChat.message"
+                                   ng-minlength="1"
+                                   ng-maxlength="150"
+                                   required>
+                            <span class="input-group-btn">
+                                <select id="chatPriority"
+                                        name="chatPriority"
+                                        class="btn btn-sm btn-default"
+                                        ng-model="chatVm.newChat.priority"
+                                        ng-options="p.priority as p.priorityLabel for p in chatVm.priorityList"
+                                        ng-class="{'btn-warning':chatVm.newChat.priority==2,'btn-danger':chatVm.newChat.priority==3,'error': chatVm.showNewChatErrors && !chatVm.chatForm.chatInput.$valid}"
+                                        ng-required="true"></select>
+                                <button class="btn btn-sm btn-primary" type="submit">Send</button>
+                                <button class="btn btn-sm btn-default m-r-md" type="button" ng-click="chatVm.showSearchButton()">Filter</button>
+                            </span>
+                        </div>
+                        <div role="alert" class="help-inline error text-center text-danger text-capitalize">
+                            <span class="error" ng-show="chatVm.showNewChatErrors && chatVm.chatForm.chatInput.$error.required">Message Required</span>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="ibox-footer" ng-show="chatVm.showSearch">
+            <form name="chatVm.querySettings" id="querySettings">
+                <div class="btn-group">
+                    <div class="m-sm">
+                        <label for="dateStart">Start Date: </label>
+                        <input type="date"
+                               name="dateStart"
+                               class="btn btn-sm btn-default"
+                               uib-datepicker-popup
+                               ng-model="chatVm.dateStart"
+                               is-open="opened"
+                               min-date="minDate"
+                               max-date="'2016-01-01'"
+                               datepicker-options="dateOptions"
+                               date-disabled="disabled(date, mode)"
+                               ng-required="false"
+                               close-text="Close" />
+                    </div>
+                    <div class="m-sm">
+                        <label for="dateEnd">End Date:  </label>
+                        <input type="date"
+                               name="dateEnd"
+                               class="btn btn-sm btn-default"
+                               uib-datepicker-popup
+                               ng-model="chatVm.dateEnd"
+                               is-open="opened"
+                               min-date="minDate"
+                               max-date="'2015-02-01'"
+                               datepicker-options="dateOptions"
+                               date-disabled="disabled(date, mode)"
+                               ng-required="false"
+                               close-text="Close" />
+                    </div>
+                    <div class="m-sm" ng-show="(chatVm.whichView==1)">
+                        <label for="sortByAccount">Sort By Account</label>
+                        <select name="sortByAccount"
+                                class="btn btn-sm btn-default"
+                                ng-model="chatVm.accountIdDropDown"
+                                ng-options="acct.id as acct.accountName for acct in chatVm.accountsList"></select>
+                    </div>
+                    <div class="m-sm" ng-show="(chatVm.whichView==1)">
+                        <label for="sortByEmployee">Sort By Employee</label>
+                        <select name="sortByEmployee"
+                                class="btn btn-sm btn-default"
+                                ng-model="chatVm.employeeIdDropDown"
+                                ng-options="emp.id as emp.firstName + ' ' + emp.lastName for emp in chatVm.employeesList"></select>
+                    </div>
+                    <div class="m-sm">
+                        <label for="queryPriority">Sort By Priority</label>
+                        <select id="queryPriorty"
+                                name="queryPriority"
+                                class="btn btn-sm btn-default"
+                                ng-model="chatVm.query.priorityQuery"
+                                ng-options="p.priority as p.priorityLabel for p in chatVm.priorityList"
+                                ng-class="{'btn-warning':chatVm.query.priorityQuery==2, 'btn-danger':chatVm.query.priorityQuery==3}"
+                                ng-required="false"></select>
+                    </div>
+                    <div class="btn-group m-sm">
+                        <button type="button" class="btn btn-sm btn-default" ng-click="chatVm.search()">Search</button>
+                        <button type="button" class="btn btn-sm btn-default" ng-click="chatVm.reset()">Reset</button>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<script type="text/ng-template" id="adminChatTemplate">
+    <div class="chat-message"
+         ng-class="{'text-warning': chat.priority == 2, 'text-danger': chat.priority == 3, 'left':chatVm.thisEmployee.id != chat.employeeId, 'right': chatVm.thisEmployee.id == chat.employeeId}">
+        <img class="message-avatar" ng-src="{{chatVm.chatPic(chat.employeeId)}}" alt="profile pic">
+        <div class="message">
+            <span class="message-date">{{chat.accountName}}</span>
+            <span class="message-content" style="font-size:smaller">{{chat.datePostedLocal|date:"short"}}</span>
+            <a class="message-author" style="font-size:smaller" ng-click="chatVm.softDelete(chat)">{{chat.employeeFirstName}} {{chat.employeeLastName}}</a>
+            <span class="message-content">{{chat.message}}</span>
+        </div>
+    </div>
+</script>
+
+<script type="text/ng-template" id="guardChatTemplate">
+    <div class="chat-message"
+         ng-class="{'text-warning': chat.priority == 2, 'text-danger': chat.priority == 3, 'left':chatVm.thisEmployee.id != chat.employeeId, 'right': chatVm.thisEmployee.id == chat.employeeId}">
+        <img class="message-avatar" ng-src="{{chatVm.chatPic(chat.employeeId)}}" alt="profile pic">
+        <div class="message">
+            <a class="message-author" style="font-size:smaller">{{chat.employeeFirstName}} {{chat.employeeLastName}}</a>
+            <span class="message-date">{{chat.datePostedLocal|date:"short"}}</span>
+            <span class="message-content" style="font-size:larger">{{chat.message}}</span>
+
+        </div>
+    </div>
+</script>
