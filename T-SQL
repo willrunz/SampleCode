@@ -1,0 +1,82 @@
+USE [MagicGadget]
+GO
+/****** Object:  StoredProcedure [dbo].[Lists_UpdateList_CrudListItems]    Script Date: 9/23/2016 1:54:43 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+Alter PROC [dbo].[Lists_UpdateList_CrudListItems_V2]
+	@Id int
+	, @Name nvarchar(50) = null
+	, @Note nvarchar(50) = null
+	, @StoreId int = null
+	, @ListCategoryId int = null
+	, @QuantitiesTvp dbo.QuantitiesTvp readonly
+AS 
+/*---------Test Code-------------
+	Select *
+	From dbo.Lists
+
+	Select *
+	From dbo.ListItems
+
+	DECLARE @Id int = 1
+			, @Name nvarchar(50) = 'Test List'
+			, @Note nvarchar(500) = 'no note'
+			, @StoreId int = null
+			, @ListCategoryId int = null
+
+	DECLARE @QuantitiesTvp dbo.QuantitiesTvp 
+
+	INSERT INTO @QuantitiesTvp (Id, ListId, ItemId, Quantity, QuantityType)
+	VALUES (0, 0, 6, 31, 'lbs')
+
+		INSERT INTO @QuantitiesTvp (Id, ListId, ItemId, Quantity, QuantityType)
+	VALUES (5, 1, 4, 25, 'lbs')
+
+	Exec dbo.Lists_UpdateList_CrudListItems_V2
+			@Id
+			, @Name
+			, @Note
+			, @StoreId
+			, @ListCategoryId
+			, @QuantitiesTvp 
+
+	Select *
+	From dbo.Lists
+
+	Select *
+	From dbo.ListItems
+
+*/
+
+BEGIN
+
+
+	UPDATE Lists 
+		SET Name = @Name
+			, Note = @Note
+			, StoreId = @StoreId
+			, ListCategoryId = @ListCategoryId
+		WHERE @Id = Id
+
+	INSERT dbo.ListItems (ListId, ItemId, Quantity, QuantityType)
+		SELECT ListId = @Id
+				, ItemId
+				, Quantity
+				, QuantityType
+		FROM @QuantitiesTvp qtvp
+		WHERE qtvp.Id < 1
+
+	UPDATE dbo.ListItems
+		SET ListId = qtvp.ListId
+			, ItemId = qtvp.ItemId
+			, Quantity = qtvp.Quantity
+			, QuantityType = qtvp.QuantityType
+		FROM dbo.ListItems INNER JOIN @QuantitiesTvp AS qtvp
+		ON dbo.ListItems.Id = qtvp.Id
+
+	DELETE 
+		FROM dbo.ListItems 
+		WHERE Quantity = 0
+END
