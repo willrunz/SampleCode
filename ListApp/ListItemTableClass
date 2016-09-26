@@ -1,0 +1,49 @@
+    public class ListItemTable : IEnumerable<SqlDataRecord>
+    {
+        private IEnumerable<AppListItemAddRequest> _listItems;
+
+        public ListItemTable(IEnumerable<AppListItemAddRequest> listItems)
+        {
+            _listItems = listItems;
+        }
+
+        private static SqlDataRecord GetRecord()
+        {
+            return new SqlDataRecord(
+                new SqlMetaData[] {
+                    new SqlMetaData("@Id", SqlDbType.Int)
+                    , new SqlMetaData("@ListId", SqlDbType.Int)
+                    , new SqlMetaData("@ItemId", SqlDbType.Int)
+                    , new SqlMetaData("@Quantity", SqlDbType.Decimal)
+                    , new SqlMetaData("@QuantityType", SqlDbType.NVarChar, 50) }
+                );
+        }
+
+        public IEnumerator<SqlDataRecord> GetEnumerator()
+        {
+            if (_listItems != null)
+            {
+                foreach (AppListItemAddRequest listItem in _listItems)
+                {
+                    var rec = new SqlDataRecord();
+
+                    rec = GetRecord();
+
+                    rec.SetValue(0, listItem.Id);
+                    rec.SetValue(1, listItem.ListId);
+                    rec.SetValue(2, listItem.ItemId);
+                    rec.SetValue(3, listItem.Quantity);
+                    rec.SetValue(4, listItem.QuantityType);
+
+                    yield return rec;
+                }
+            }
+
+            yield break;
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+    }
