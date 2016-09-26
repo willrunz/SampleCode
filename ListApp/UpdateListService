@@ -1,0 +1,27 @@
+        public static void Update (AppListUpdateRequest model)
+        {
+            DataProvider.ExecuteNonQuery(GetConnection, "dbo.Lists_UpdateList_CrudListItems_V2"
+                , inputParamMapper: delegate (SqlParameterCollection pc)
+                {
+                    pc.AddWithValue("@Id", model.Id);
+                    CommonParameters(model, pc);
+
+                }, returnParameters: null
+                );
+        }
+
+        #region Mappers
+        private static void CommonParameters(AppListAddRequest model, SqlParameterCollection pc)
+        {
+            pc.AddWithValue("@Name", model.Name);
+            pc.AddWithValue("@Note", model.Note);
+            pc.AddWithValue("@StoreId", model.StoreId);
+            pc.AddWithValue("@ListCategoryId", model.ListCategoryId);
+
+            SqlParameter p = new SqlParameter("@QuantitiesTvp", SqlDbType.Structured);
+            if (model.ListItems != null && model.ListItems.Any())
+            {
+                p.Value = new ListItemTable(model.ListItems);
+            }
+            pc.Add(p);
+        }
