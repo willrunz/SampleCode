@@ -1,0 +1,51 @@
+    [RoutePrefix("api/signup")]
+    public class SignUpApiController : ApiController
+    {
+        ISignUpService _signUpService;
+
+        public SignUpApiController(ISignUpService signUpService)
+        {
+            _signUpService = signUpService;
+        }
+
+
+        [Route(), HttpPost]
+        public async Task<HttpResponseMessage> Confirm(SignUpAddRequest request)
+        {
+            if (!ModelState.IsValid && request != null)
+            {
+                return Request.CreateErrorResponse(HttpStatusCode.BadRequest, ModelState);
+            }
+            try
+            {
+                //this request is triggered by the /signUp page
+                await _signUpService.SendConfirmationAsync(request);
+                SuccessResponse sr = new SuccessResponse();
+                return Request.CreateResponse(HttpStatusCode.OK, sr);
+            }
+            catch (Exception ex)
+            {
+                ErrorResponse response = new ErrorResponse(ex.Message);
+                return Request.CreateResponse(HttpStatusCode.InternalServerError, response);
+            }
+        }
+
+        [Route("register"), HttpPost]
+        public HttpResponseMessage Register(ConfirmSignUpAddRequest companyAndAdmin)
+        {
+            if (!ModelState.IsValid && companyAndAdmin != null)
+            {
+                return Request.CreateErrorResponse(HttpStatusCode.BadRequest, ModelState);
+            }
+            try
+            {
+                _signUpService.CreateCompanyAndAdmin(companyAndAdmin);
+                SuccessResponse sr = new SuccessResponse();
+                return Request.CreateResponse(HttpStatusCode.OK, sr);
+            }
+            catch (Exception ex)
+            {
+                ErrorResponse response = new ErrorResponse(ex.Message);
+                return Request.CreateResponse(HttpStatusCode.InternalServerError, response);
+            }
+        }
